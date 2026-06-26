@@ -5,6 +5,7 @@ import 'minMaxFreq.dart';
 class CpuInfo {
   late int numberOfCores;
   late double cpuTemperature;
+  late double shellTemperature;
   late String abi;
   late Map<int, MinMaxFrequency> minMaxFrequencies = Map<int, MinMaxFrequency>();
   late Map<int, int> currentFrequencies = Map<int, int>();
@@ -14,13 +15,16 @@ class CpuInfo {
       required this.abi,
       required this.minMaxFrequencies,
       required this.currentFrequencies,
-      required this.cpuTemperature});
+      required this.cpuTemperature,
+      this.shellTemperature = -1.0});
 
   /// Deserialize the data [json] retrieved from the device through platform specific code
   CpuInfo.fromJson(Map<dynamic, dynamic> json) {
     this.numberOfCores = json['numberOfCores'];
     this.abi = json['abi'];
     this.cpuTemperature = json['cpuTemperature'];
+    this.shellTemperature =
+        (json['shellTemperature'] as num?)?.toDouble() ?? -1.0;
     Map.from(json['currentFrequencies']).forEach((key, value) {
       this.currentFrequencies[key] = value;
     });
@@ -36,6 +40,7 @@ class CpuInfo {
         "abi": abi,
         "numberOfCores": numberOfCores,
         "cpuTemprature": cpuTemperature,
+        "shellTemperature": shellTemperature,
         "currentFrequencies": currentFrequencies.map(_convert),
         "minMaxFrequencies": minMaxFrequencies.map(_convert)
       };

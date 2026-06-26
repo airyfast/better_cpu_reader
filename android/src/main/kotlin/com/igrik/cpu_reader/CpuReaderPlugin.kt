@@ -51,6 +51,7 @@ class CpuReaderPlugin : FlutterPlugin, MethodCallHandler {
         } as MutableMap<Int, Map<String, Long>>
 
         val cpuTemperature = cpuProvider.getCpuTemperature()
+        val shellTemperature = cpuProvider.getShellTemperature()
         val currentFrequencies = mutableMapOf<Int, Long>()
         for (i in 0 until cores as Int) {
             currentFrequencies[i] = cpuProvider.getCurrentFreq(i)
@@ -61,6 +62,7 @@ class CpuReaderPlugin : FlutterPlugin, MethodCallHandler {
         map["minMaxFrequencies"] = minMaxFrequencies
         map["currentFrequencies"] = currentFrequencies
         map["cpuTemperature"] = cpuTemperature
+        map["shellTemperature"] = shellTemperature
 
         return map
     }
@@ -79,6 +81,7 @@ class CpuReaderPlugin : FlutterPlugin, MethodCallHandler {
                 result.success(mapOf(pair))
             }
             "getCpuTemperature" -> result.success(cpuProvider.getCpuTemperature())
+            "getShellTemperature" -> result.success(cpuProvider.getShellTemperature())
             "getCpuInfo" -> result.success(getCpuInfo())
             else -> {
                 result.notImplemented()

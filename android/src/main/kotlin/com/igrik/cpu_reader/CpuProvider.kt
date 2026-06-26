@@ -94,22 +94,39 @@ class CpuDataProvider constructor() {
      * `cpu_thermal`, `soc_thermal`), then reads its `temp` file. Falls back to
      * `thermal_zone0` if no CPU zone is found. Returns -1.0 on failure.
      */
-    fun getCpuTemperature(): Double {
-        val zone = findCpuThermalZone() ?: "thermal_zone0"
+    fun getCpuTemperature(): Double = readThermalZone(CPU_THERMAL_TYPE_REGEX) ?: -1.0
+
+    /**
+     * Retrieves the current shell (skin/surface) temperature of the device.
+     *
+     * Shell temperature is what typically drives thermal throttling for
+     * long-running heavy workloads. It is read from the sysfs thermal zone
+     * whose `type` identifies a skin/shell/surface sensor (e.g. `skin`,
+     * `shell`, `surface`). Returns -1.0 if no such zone is available.
+     */
+    fun getShellTemperature(): Double = readThermalZone(SHELL_THERMAL_TYPE_REGEX) ?: -1.0
+
+    /**
+     * Reads the temperature (in degrees Celsius) of the first thermal zone
+     * whose `type` matches [typeRegex]. Returns null if no matching zone is
+     * found or its `temp` file cannot be read.
+     */
+    private fun readThermalZone(typeRegex: Regex): Double? {
+        val zone = findThermalZone(typeRegex) ?: return null
         val tempPath = "$THERMAL_DIR$zone/temp"
         return try {
             RandomAccessFile(tempPath, "r").use { it.readLine().toDouble() / 1000 }
         } catch (e: Exception) {
             Timber.e(e)
-            -1.0
+            null
         }
     }
 
     /**
-     * Returns the name of the sysfs thermal zone whose `type` matches a known
-     * CPU sensor, or null if none is found.
+     * Returns the name of the sysfs thermal zone whose `type` matches
+     * [typeRegex], or null if none is found.
      */
-    private fun findCpuThermalZone(): String? {
+    private fun findThermalZone(typeRegex: Regex): String? {
         return try {
             val dir = File(THERMAL_DIR)
             val zones = dir.listFiles { file -> file.name.startsWith("thermal_zone") }
@@ -120,7 +137,7 @@ class CpuDataProvider constructor() {
                 } catch (e: Exception) {
                     null
                 }
-                if (type != null && CPU_THERMAL_TYPE_REGEX.containsMatchIn(type)) {
+                if (type != null && typeRegex.containsMatchIn(type)) {
                     return zone.name
                 }
             }
@@ -136,5 +153,8 @@ class CpuDataProvider constructor() {
         // Common CPU thermal-zone type names across vendors.
         private val CPU_THERMAL_TYPE_REGEX =
             Regex("(?i)x86_pkg_temp|cpu[-_]?thermal|soc[-_]?thermal|cpu|cpu-0|apc")
+        // Common shell/skin/surface thermal-zone type names across vendors.
+        private val SHELL_THERMAL_TYPE_REGEX =
+            Regex("(?i)\\bskin\\b|\\bshell\\b|\\bsurface\\b|\\bsoc_skin\\b|\\bpanel\\b")
     }
 }

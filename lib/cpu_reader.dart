@@ -72,6 +72,15 @@ class CpuReader {
     return await _channel.invokeMethod("getCpuTemperature");
   }
 
+  /// Retrieves the current shell (skin/surface) temperature from the device.
+  ///
+  /// Shell temperature typically drives thermal throttling for long-running
+  /// heavy workloads. Returns -1.0 if the device does not expose a shell
+  /// thermal sensor.
+  static Future<double> getShellTemperature() async {
+    return await _channel.invokeMethod("getShellTemperature");
+  }
+
   /// This retries the overall information [CpuInfo] of the device CPU.
   static Future<CpuInfo> get cpuInfo async {
     try {
