@@ -1,8 +1,6 @@
 package com.igrik.cpu_reader
 
-import android.content.Context
 import android.os.Build
-import android.os.HardwarePropertiesManager
 import timber.log.Timber
 import java.io.*
 import java.util.regex.Pattern
@@ -11,7 +9,7 @@ import java.util.regex.Pattern
  * This class is responsible for providing CPU specific information
  * such as ABI, number of cores, temperature and frequencies
  */
-class CpuDataProvider constructor(private val context: Context? = null) {
+class CpuDataProvider constructor() {
     /**
     Read Android Binary Interface information from the device
      */
@@ -91,37 +89,14 @@ class CpuDataProvider constructor(private val context: Context? = null) {
     /**
      * Retrieves the current overall thermal temperature for all the CPUs.
      *
-     * Uses [HardwarePropertiesManager.getDeviceTemperatures] with
-     * [HardwarePropertiesManager.DEVICE_TEMPERATURE_CPU] and
-     * [HardwarePropertiesManager.TEMPERATURE_CURRENT] on API 24+ (the API
-     * requires a [Context]). Falls back to reading the sysfs thermal zone on
-     * older devices or when the manager is unavailable.
+     * Scans the sysfs thermal zones (`/sys/class/thermal/thermal_zone*`) and
+     * picks the one whose `type` identifies a CPU sensor (e.g. `x86_pkg_temp`,
+     * `cpu_thermal`, `soc_thermal`), then reads its `temp` file. Falls back to
+     * `thermal_zone0` if no CPU zone is found. Returns -1.0 on failure.
      */
     fun getCpuTemperature(): Double {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && context != null) {
-            try {
-                val manager = context.getSystemService(Context.HARDWARE_PROPERTIES_SERVICE)
-                        as? HardwarePropertiesManager
-                if (manager != null) {
-                    val temps = manager.getDeviceTemperatures(
-                        HardwarePropertiesManager.DEVICE_TEMPERATURE_CPU,
-                        HardwarePropertiesManager.TEMPERATURE_CURRENT
-                    )
-                    if (temps.isNotEmpty()) {
-                        // Take the highest reported CPU temperature as the
-                        // overall value (multiple CPU sensors may be returned).
-                        return temps.maxOrNull()!!.toDouble()
-                    }
-                }
-            } catch (e: Exception) {
-                Timber.e(e)
-            }
-        }
-        return readCpuTemperatureLegacy()
-    }
-
-    private fun readCpuTemperatureLegacy(): Double {
-        val tempPath = "sys/class/thermal/thermal_zone0/temp"
+        val zone = findCpuThermalZone() ?: "thermal_zone0"
+        val tempPath = "$THERMAL_DIR$zone/temp"
         return try {
             RandomAccessFile(tempPath, "r").use { it.readLine().toDouble() / 1000 }
         } catch (e: Exception) {
@@ -130,7 +105,36 @@ class CpuDataProvider constructor(private val context: Context? = null) {
         }
     }
 
+    /**
+     * Returns the name of the sysfs thermal zone whose `type` matches a known
+     * CPU sensor, or null if none is found.
+     */
+    private fun findCpuThermalZone(): String? {
+        return try {
+            val dir = File(THERMAL_DIR)
+            val zones = dir.listFiles { file -> file.name.startsWith("thermal_zone") }
+                ?: return null
+            for (zone in zones) {
+                val type = try {
+                    RandomAccessFile(File(zone, "type"), "r").use { it.readLine() }
+                } catch (e: Exception) {
+                    null
+                }
+                if (type != null && CPU_THERMAL_TYPE_REGEX.containsMatchIn(type)) {
+                    return zone.name
+                }
+            }
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     companion object {
         private const val CPU_INFO_DIR = "/sys/devices/system/cpu/"
+        private const val THERMAL_DIR = "/sys/class/thermal/"
+        // Common CPU thermal-zone type names across vendors.
+        private val CPU_THERMAL_TYPE_REGEX =
+            Regex("(?i)x86_pkg_temp|cpu[-_]?thermal|soc[-_]?thermal|cpu|cpu-0|apc")
     }
 }

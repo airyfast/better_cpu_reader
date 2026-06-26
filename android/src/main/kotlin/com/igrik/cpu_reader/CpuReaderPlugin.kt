@@ -29,7 +29,7 @@ class CpuReaderPlugin : FlutterPlugin, MethodCallHandler {
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.flutterEngine.dartExecutor, "cpu_reader")
         channel.setMethodCallHandler(this)
-        cpuProvider = CpuDataProvider(flutterPluginBinding.applicationContext)
+        cpuProvider = CpuDataProvider()
         cache = hashMapOf<String, Any>()
     }
 
